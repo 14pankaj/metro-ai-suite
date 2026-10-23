@@ -1,6 +1,6 @@
 # Get Started
 
-The Agentic Predictive Maintenance for Critical Infrastructure (APM) blueprint lets you deploy an end-to-end industrial defect
+The Agentic Predictive Maintenance (APM) blueprint lets you deploy an end-to-end industrial defect
 detection pipeline with AI-driven analysis on Intel® edge hardware. This section shows how to set up, configure, and run the application.
 
 ## Prerequisites
@@ -13,7 +13,7 @@ Before you start, ensure the following:
 - Python programming language version 3.10 or later: only needed to prepare sample data.
 - `opencv-python` Python package: only needed for the data preparation script.
 - A Hugging Face account and API token if you use a gated model such as
-  `microsoft/Phi-4-mini-instruct`,`Qwen/Qwen2.5-1.5B-Instruct`.
+  `microsoft/Phi-4-mini-instruct`.
 
 Verify that your system meets the
 [hardware and software requirements](./get-started/system-requirements.md) before continuing.
@@ -21,7 +21,7 @@ Verify that your system meets the
 ## Project Structure
 
 ```text
-agentic-predictive-maintenance-pipeline/
+agentic-predictive-maintenance/
 ├── apps/
 │   └── pipeline-defect-detection/     # Use-case configuration directory
 │       ├── configs/
@@ -54,16 +54,18 @@ agentic-predictive-maintenance-pipeline/
 └── setup.sh                           # Main deployment script
 ```
 
-> [!NOTE]
-> Each use case ships with its own `.env_<use-case>` file already populated
+> **Note**: Each use case ships with its own `.env_<use-case>` file already populated
 > with working defaults at `apps/<use-case>/.env_<use-case>` — you do not need to create
-> it yourself; `setup.sh` reads it from that location automatically.
+> it yourself; `setup.sh` reads it from that location automatically. The folder name may
+> differ from the use-case name: `setup.sh` locates the use case by its
+> `apps/*/.env_<use-case>` file (for example, `--use-case gas-detection` resolves to
+> `apps/gas-detection-multimodal/.env_gas-detection`).
 
 ## Step 1 — Clone the Repository
 
 ```bash
-git clone https://github.com/open-edge-platform/metro-ai-suite.git
-cd metro-ai-suite/agentic-predictive-maintenance-pipeline
+git clone https://github.com/open-edge-platform/edge-ai-suites.git
+cd edge-ai-suites/metro-ai-suite/agentic-predictive-maintenance
 ```
 
 ## Step 2 — Configure the Environment
@@ -79,7 +81,7 @@ The most important variables are:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LLM_MODE` | `llm` | Set to `fallback` to run without an LLM (rule-based mode) |
-| `LLM_MODEL_NAME` | `microsoft/Phi-4-mini-instruct`, `Qwen/Qwen2.5-1.5B-Instruct` | Language model used by the agent pipeline |
+| `LLM_MODEL_NAME` | `microsoft/Phi-4-mini-instruct` | Language model used by the agent pipeline |
 | `LLM_DEVICE` | `CPU` | Inference device: `CPU`, `GPU`, or `NPU` |
 | `LLM_WEIGHT_FORMAT` | `int4` | Model quantization format: `fp32`, `fp16`, `int8`, or `int4` |
 | `DL_DEVICE` | `CPU` | Default DL Streamer mode. The UI device list is hardware-detected: `CPU` is always available, `GPU` appears when `/dev/dri/render*` exists, and `NPU` appears when `/dev/accel` exists. |
@@ -95,8 +97,7 @@ If you are using a gated Hugging Face model, set your API token:
 HUGGINGFACEHUB_API_TOKEN=hf_your_token_here
 ```
 
-> [!NOTE]
-> Accept the model license agreement on the
+> **Note**: Accept the model license agreement on the
 > [Hugging Face model page](https://huggingface.co/microsoft/Phi-4-mini-instruct) before using
 > the gated models.
 
@@ -125,8 +126,7 @@ This script:
 > for release validation. To train a detector for your own inspection scenario, see
 > [Training a Defect Detection Model with Intel Geti](./training-with-geti.md).
 
-> [!NOTE]
-> Skip this step if you have your own video, or if you plan to run in
+> **Note**: Skip this step if you have your own video, or if you plan to run in
 > `LLM_MODE=fallback` where no video or DL Streamer inference is required.
 
 > **Disclaimer**: By running this script you acknowledge that you are solely responsible for the
@@ -150,8 +150,7 @@ writes the resulting local path back into
 `apps/pipeline-defect-detection/.env_pipeline-defect-detection`
 as `LLM_MODEL_PATH`. `setup.sh` mounts this path read-only into the `apm-llm` container.
 
-> [!NOTE]
-> Skip this step entirely if `LLM_MODE=fallback` — the script detects this and exits
+> **Note**: Skip this step entirely if `LLM_MODE=fallback` — the script detects this and exits
 > immediately without downloading anything.
 
 ## Step 5 — Launch the Application
@@ -231,10 +230,6 @@ Ask & Analyze is available in `LLM_MODE=llm`. In `LLM_MODE=fallback`, the dashbo
 workflow, and rule-based agent pipeline remain available, but chat cannot generate answers because
 the deployment omits the `apm-llm` service. The UI intentionally has no hard Compose dependency on that service,
 which allows fallback deployments to start normally.
-
-> [!NOTE]
-> Fallback mode: If you deployed with `LLM_MODE=fallback`, the **Ask & Analyze** page
-> displays a banner explaining that conversational analysis is disabled. The chat form is locked.
 
 ## Stop and Clean Up
 

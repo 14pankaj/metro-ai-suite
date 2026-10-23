@@ -1,19 +1,18 @@
-# Release Notes: Agentic Predictive Maintenance for Critical Infrastructure
+# Release Notes: Agentic Predictive Maintenance
 
 ## Version 2026.2.0
-
-**Release Date**: September 10, 2026
+**TBD**
 
 **Features**:
 
-- **Initial release** of the Agentic Predictive Maintenance for Critical Infrastructure (APM) blueprint.
+- **Initial release** of the Agentic Predictive Maintenance (APM) blueprint.
 - Configuration-driven multi-agent pipeline using LangGraph. Adapt to any defect detection use case
   by editing four configuration files — no code changes required.
 - Four-agent reasoning pipeline: Policy Agent, Analysis Agent, Evidence Agent, and Ticketing Agent
   run sequentially to analyze detections and generate structured maintenance tickets. The reasoning
   agent (`apm-agent`) is not built from this repo — it is an external image (Intel EAL's
   `agent-quality-handler` microservice) pulled via `docker/compose.agents.yaml`. See the
-  [agent-service integration guide](https://docs.openedgeplatform.intel.com/dev/edge-ai-libraries/agent-quality-handler/agent-service-integration-guide.html) for its contract.
+  [agent-service integration guide](agent-service-integration-guide.md) for its contract.
 - Two operating modes: Large Language Model (LLM) mode for AI-generated analysis (using OpenVINO
   Model Server) and fallback mode for rule-based operation without an LLM service.
 - Real-time video inference via Deep Learning Streamer (DL Streamer) with YOLO-based object detection; DL Streamer publishes
@@ -41,8 +40,6 @@
 
 **Known Limitations**:
 
-- Neural Processing Unit (NPU) inference support for the LLM service is
-  experimental and is not validated for all model and configuration combinations.
-- Only the `pipeline-defect-detection` use case is provided as a reference
-  configuration. Additional use cases require manual configuration file setup.
+- Neural Processing Unit (NPU) inference support for the LLM service is experimental and is not validated for all model and configuration combinations.
+- Only the `pipeline-defect-detection` use case is provided as a reference configuration. Additional use cases require manual configuration file setup.
 - This release does not include a Helm chart for Kubernetes deployment.
