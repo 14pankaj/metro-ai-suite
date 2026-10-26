@@ -36,6 +36,7 @@ services:
       MQTT_BATCH_CLIENT_ID: ${MQTT_BATCH_CLIENT_ID:-apm-agent-batch}
       # Use-case config — agents.yaml itself declares use_case_id
       AGENTS_CONFIG_PATH: /app/config/agents.yaml
+      AGENT_MODE: sequential
       USE_CASE_PROMPTS_DIR: /app/prompts
       USE_CASE_CONFIGS_DIR: /app/config
       FALLBACK_POLICY_PATH: /app/config/policy_fallback.json
