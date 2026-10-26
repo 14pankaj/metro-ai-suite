@@ -3,7 +3,8 @@
 This section shows how to build the APM blueprint's application
 images from source code.
 
-> **Note**: You only need to build from source if you want to customize the application code. For
+> [!NOTE]
+> You only need to build from source if you want to customize the application code. For
 > standard deployments, the prebuilt images referenced in the Docker Compose files are sufficient.
 
 ## Prerequisites
@@ -17,8 +18,8 @@ images from source code.
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/open-edge-platform/edge-ai-libraries.git
-cd edge-ai-libraries/sample-applications/agentic-predictive-maintenance
+git clone https://github.com/open-edge-platform/metro-ai-suite.git
+cd metro-ai-suite/agentic-predictive-maintenance
 ```
 
 ### 2. Configure the Build

@@ -2,12 +2,12 @@
 
 This directory contains the use-case-specific configuration for the
 **Pipeline Defect Detection** sample application, built on the
-Agentic Predictive Maintenance Blueprint from `edge-ai-libraries`.
+Agentic Predictive Maintenance Blueprint from `metro-ai-suite`.
 
 ## Quick Start
 
 ```bash
-cd <edge-ai-libraries>/sample-applications/agentic-predictive-maintenance
+cd metro-ai-suite/agentic-predictive-maintenance
 ./setup.sh --use-case pipeline-defect-detection \
   --use-case-dir <path-to-this-directory>
 ```
