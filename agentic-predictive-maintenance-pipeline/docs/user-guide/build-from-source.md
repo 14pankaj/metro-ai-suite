@@ -53,8 +53,7 @@ The build targets use the Dockerfiles located in `services/<service-name>/Docker
 
 The reasoning agent (`apm-agent`) is no longer built from this repo — it is
 an external image (Intel EAL's `agent-quality-handler` microservice) pulled
-via `docker/compose.agents.yaml`. See the [agent-service integration
-guide](agent-service-integration-guide.md) for its contract.
+via `docker/compose.agents.yaml`.
 
 ### 4. Verify the Build
 

@@ -11,8 +11,7 @@
 - Four-agent reasoning pipeline: Policy Agent, Analysis Agent, Evidence Agent, and Ticketing Agent
   run sequentially to analyze detections and generate structured maintenance tickets. The reasoning
   agent (`apm-agent`) is not built from this repo — it is an external image (Intel EAL's
-  `agent-quality-handler` microservice) pulled via `docker/compose.agents.yaml`. See the
-  [agent-service integration guide](agent-service-integration-guide.md) for its contract.
+  `agent-quality-handler` microservice) pulled via `docker/compose.agents.yaml`.
 - Two operating modes: Large Language Model (LLM) mode for AI-generated analysis (using OpenVINO
   Model Server) and fallback mode for rule-based operation without an LLM service.
 - Real-time video inference via Deep Learning Streamer (DL Streamer) with YOLO-based object detection; DL Streamer publishes

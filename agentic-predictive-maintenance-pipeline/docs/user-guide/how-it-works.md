@@ -220,10 +220,6 @@ docker exec apm-mqtt-broker mosquitto_sub -t 'apm/batch-complete'
 }
 ```
 
-See the [agent-service integration guide](agent-service-integration-guide.md)
-for the full contract any application needs to satisfy for plugging its own
-detection layer into the agent-service, or vice versa.
-
 ## Stage 5 — Multi-Agent Reasoning (LangGraph)
 
 The agent-service's meta-agent runs four agents via a LangGraph state
