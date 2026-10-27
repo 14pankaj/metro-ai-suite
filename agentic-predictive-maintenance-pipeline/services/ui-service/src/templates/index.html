@@ -57,7 +57,7 @@
                 <span>Device</span>
                 <select name="device">
                   {% for d in devices %}
-                  <option value="{{ d }}" {{ 'selected' if d == 'CPU' else '' }}>{{ d }}</option>
+                  <option value="{{ d }}" {{ 'selected' if d == selected_device else '' }}>{{ d }}</option>
                   {% endfor %}
                 </select>
               </label>
@@ -89,7 +89,7 @@
                 <span>Device</span>
                 <select name="device">
                   {% for d in devices %}
-                  <option value="{{ d }}" {{ 'selected' if d == 'CPU' else '' }}>{{ d }}</option>
+                  <option value="{{ d }}" {{ 'selected' if d == selected_device else '' }}>{{ d }}</option>
                   {% endfor %}
                 </select>
               </label>

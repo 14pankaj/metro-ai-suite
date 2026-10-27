@@ -154,6 +154,16 @@ async function pollStatus() {
     const configFieldset = document.getElementById("pipeline-config-fieldset");
     if (configFieldset) configFieldset.disabled = !!data.active_run;
 
+    // While a run is active, show the device it is actually running on.
+    if (data.active_run && data.active_run.device) {
+      document.querySelectorAll('select[name="device"]').forEach((sel) => {
+        if (sel.value !== data.active_run.device &&
+            Array.from(sel.options).some((o) => o.value === data.active_run.device)) {
+          sel.value = data.active_run.device;
+        }
+      });
+    }
+
     const phaseHint = document.getElementById("run-phase-hint");
     if (phaseHint) phaseHint.textContent = phaseHintText(data.active_run);
   } catch (err) {

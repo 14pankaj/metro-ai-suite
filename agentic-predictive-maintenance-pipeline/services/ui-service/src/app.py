@@ -1105,16 +1105,17 @@ def _merge_runs(det_runs: list[dict], agent_runs: list[dict]) -> list[dict]:
     for det in det_runs:
         run_id = det["run_id"]
         det_phase = det.get("phase")
+        device = det.get("device")
         if det_phase == "detecting":
-            merged.append({"run_id": run_id, "status": "running", "phase": "detecting"})
+            merged.append({"run_id": run_id, "status": "running", "phase": "detecting", "device": device})
         elif det_phase == "error":
-            merged.append({"run_id": run_id, "status": "error", "phase": "error"})
+            merged.append({"run_id": run_id, "status": "error", "phase": "error", "device": device})
         else:  # detection completed -> reasoning phase owned by agent-service
             agent = agent_by_id.get(run_id)
             if agent is None:
-                merged.append({"run_id": run_id, "status": "running", "phase": "reasoning"})
+                merged.append({"run_id": run_id, "status": "running", "phase": "reasoning", "device": device})
             else:
-                merged.append({"run_id": run_id, "status": agent["status"], "phase": agent.get("phase")})
+                merged.append({"run_id": run_id, "status": agent["status"], "phase": agent.get("phase"), "device": device})
     return merged
 
 
@@ -1301,6 +1302,11 @@ async def index(request: Request):
                 selected_view = None
 
     active_run = next((r for r in reversed(runs) if r.get("status") == "running"), None)
+    # Show the device the active (else most recent) run used, not a fixed default.
+    last_device = (active_run or (runs[-1] if runs else {})).get("device")
+    selected_device = last_device if last_device in _AVAILABLE_DEVICES else (
+        "CPU" if "CPU" in _AVAILABLE_DEVICES else _AVAILABLE_DEVICES[0]
+    )
 
     return templates.TemplateResponse(
         request=request, name="index.html",
@@ -1311,6 +1317,7 @@ async def index(request: Request):
             "active_run": active_run,
             "videos": videos,
             "devices": _AVAILABLE_DEVICES,
+            "selected_device": selected_device,
             "video_fps": _VIDEO_FPS,
             "multimodal_enabled": bool(_MULTIMODAL_CONFIG_PATH),
             "selected_run_id": selected_run["run_id"] if selected_run else None,
