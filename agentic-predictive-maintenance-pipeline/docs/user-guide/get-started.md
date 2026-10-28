@@ -110,7 +110,7 @@ The Deep Learning Streamer (DL Streamer) pipeline needs a video file to run. Use
 pipeline-defect dataset and build a sample video automatically:
 
 ```bash
-pip install opencv-python ffmpeg
+python3 -m pip install opencv-python ffmpeg imageio-ffmpeg
 ```
 
 ```bash

@@ -60,6 +60,7 @@ Usage
 import argparse
 import json
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -273,18 +274,58 @@ def prep_gas_detection(download_dir: Path, output_dir: Path,
 _BROWSER_SAFE_CODECS = {"h264", "hevc", "vp8", "vp9", "av1"}
 
 
+_FFMPEG_EXE = None
+
+
+def get_ffmpeg_exe():
+    """Return a path to an ffmpeg binary, installing one if none is available.
+
+    Uses ffmpeg from PATH when present; otherwise pip-installs the
+    ``imageio-ffmpeg`` package (which bundles a static ffmpeg binary) into the
+    current Python environment. Returns None if neither is possible.
+    """
+    global _FFMPEG_EXE
+    if _FFMPEG_EXE:
+        return _FFMPEG_EXE
+
+    exe = shutil.which("ffmpeg")
+    if exe is None:
+        print("   ℹ️  ffmpeg not found on PATH — installing imageio-ffmpeg...")
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--quiet", "imageio-ffmpeg"],
+                check=True, shell=False, capture_output=True,
+            )
+            import importlib
+            import imageio_ffmpeg
+            importlib.reload(imageio_ffmpeg)
+            exe = imageio_ffmpeg.get_ffmpeg_exe()
+        except (subprocess.CalledProcessError, OSError, ImportError, RuntimeError) as e:
+            print(f"   ⚠️  Could not install a bundled ffmpeg: {e}")
+            print("      Install ffmpeg manually (e.g. 'sudo apt install ffmpeg').")
+            return None
+    _FFMPEG_EXE = exe
+    return exe
+
+
 def probe_video_codec(video_path: Path):
-    """Return *video_path*'s first video stream's codec name, or None if unknown."""
+    """Return *video_path*'s first video stream's codec name, or None if unknown.
+
+    Parses ``ffmpeg -i`` output so it works with a bundled ffmpeg that ships
+    without ffprobe.
+    """
+    ffmpeg = get_ffmpeg_exe()
+    if ffmpeg is None:
+        return None
     try:
         result = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "v:0",
-             "-show_entries", "stream=codec_name", "-of", "csv=p=0", str(video_path)],
-            capture_output=True, check=False, shell=False, timeout=10,
+            [ffmpeg, "-hide_banner", "-i", str(video_path)],
+            capture_output=True, check=False, shell=False, timeout=30,
         )
-        name = result.stdout.decode(errors="replace").strip()
-        return name or None
-    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.TimeoutExpired):
         return None
+    match = re.search(r"Stream #\S+: Video: (\w+)", result.stderr.decode(errors="replace"))
+    return match.group(1) if match else None
 
 
 def repack_to_h264(video_path: Path, crf: str = "15", preset: str = "slow") -> bool:
@@ -296,10 +337,15 @@ def repack_to_h264(video_path: Path, crf: str = "15", preset: str = "slow") -> b
     perceptibly shifted near detection-confidence threshold cutoffs — pass a
     faster/lossier preset only if this file is never used for inference.
     """
+    ffmpeg = get_ffmpeg_exe()
+    if ffmpeg is None:
+        print("   ❌ ffmpeg unavailable — video is not browser-playable.")
+        return False
+
     tmp_path = video_path.with_suffix(".faststart.mp4")
     try:
         ret = subprocess.run(
-            ["ffmpeg", "-y", "-i", str(video_path),
+            [ffmpeg, "-y", "-i", str(video_path),
              "-c:v", "libx264", "-preset", preset, "-crf", crf,
              "-pix_fmt", "yuv420p", "-an",
              "-movflags", "+faststart", str(tmp_path)],
@@ -311,12 +357,11 @@ def repack_to_h264(video_path: Path, crf: str = "15", preset: str = "slow") -> b
             tmp_path.replace(video_path)
             return True
         tmp_path.unlink(missing_ok=True)
-        print("   ⚠️  ffmpeg H.264/faststart repack failed — video may not stream correctly.")
+        print("   ❌ ffmpeg H.264/faststart repack failed — video is not browser-playable.")
         print(ret.stderr.decode(errors="replace")[-300:])
         return False
-    except (FileNotFoundError, OSError):
-        print("   ⚠️  ffmpeg not found — video may not stream correctly.")
-        print("      Install ffmpeg to optimize video streaming.")
+    except OSError as e:
+        print(f"   ❌ Could not run ffmpeg: {e}")
         return False
 
 
@@ -337,10 +382,6 @@ def transcode_existing_video(video_path: Path) -> bool:
     if codec in _BROWSER_SAFE_CODECS:
         print(f"✅ {video_path} is already browser-playable (codec={codec}) — nothing to do.")
         return True
-
-    if shutil.which("ffmpeg") is None:
-        print("❌ ffmpeg not found — install ffmpeg to transcode this video.")
-        return False
 
     print(f"🎬 Transcoding {video_path} (codec={codec}) to H.264/faststart...")
     if repack_to_h264(video_path):
@@ -438,7 +479,8 @@ def create_video_from_images(images_dir: Path, video_path: Path, fps: int = 30,
     # used both for DL Streamer inference and for the browser Camera Preview
     # (so overlay timing always matches what was actually detected), hence
     # the near-lossless default CRF.
-    repack_to_h264(video_path)
+    if not repack_to_h264(video_path):
+        return False
 
     print(f"   ✅ {video_path}  ({written} frames @ {fps} fps, {written/fps:.1f}s)")
 
@@ -536,6 +578,8 @@ def main():
                     manifest_path=manifest_path,
                 ):
                     sys.exit("❌ Failed to create the gas-detection video + frame manifest.")
+            elif not transcode_existing_video(video_output_path):
+                sys.exit("❌ Existing gas-detection video is not browser-playable.")
             return
 
         download_dataset(args.dataset_url, download_dir, "gas-dataset.zip")
@@ -572,7 +616,10 @@ def main():
         # Still create video if missing
         if not video_output_path.exists():
             print("🎬 Creating video from existing val images...")
-            create_video_from_images(output_dir / "images" / "val", video_output_path)
+            if not create_video_from_images(output_dir / "images" / "val", video_output_path):
+                sys.exit("❌ Failed to create the sample video.")
+        elif not transcode_existing_video(video_output_path):
+            sys.exit("❌ Existing sample video is not browser-playable.")
         return
 
     download_dataset(args.dataset_url, download_dir, "pipeline-defect-dataset.zip")
@@ -608,7 +655,8 @@ def main():
 
     # Create sample video for DL Streamer
     print("🎬 Creating sample video for DL Streamer inference...")
-    create_video_from_images(output_dir / "images" / "val", video_output_path)
+    if not create_video_from_images(output_dir / "images" / "val", video_output_path):
+        sys.exit("❌ Failed to create the sample video.")
     print()
 
     if not args.keep_download:
