@@ -114,10 +114,6 @@ services:
     tmpfs:
       - /tmp:rw,nosuid,nodev,size=1g
       - /var/cache/pipeline_root:uid=1999,gid=1999,mode=0755
-    group_add:
-      - "109"
-      - "110"
-      - "992"
     depends_on:
       mqtt-broker:
         condition: service_healthy

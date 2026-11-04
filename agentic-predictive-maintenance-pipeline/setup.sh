@@ -287,7 +287,7 @@ case "${ACTION}" in
         if [ ! -f "${SAMPLE_VIDEO}" ]; then
             echo -e "${YELLOW}⚠️  Sample video not found: ${SAMPLE_VIDEO}${NC}"
             echo -e "${YELLOW}   Run the data prep script to download and create it:${NC}"
-            echo -e "${YELLOW}       python scripts/download_and_prep_data.py <dataset_url> --use-case ${USE_CASE}${NC}"
+            echo -e "${YELLOW}       make prepare-data USE_CASE=${USE_CASE} DATASET_URL=<dataset_url>${NC}"
             echo -e "${YELLOW}   DL Streamer will fail to start the auto_start pipeline without this file.${NC}"
             echo -e "${YELLOW}   Set LLM_MODE=fallback in ${USE_CASE_DIR}/.env_${USE_CASE} to run without DL Streamer.${NC}"
             echo

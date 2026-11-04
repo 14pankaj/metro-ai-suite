@@ -250,11 +250,159 @@ def prep_gas_detection(download_dir: Path, output_dir: Path,
 # Video creation
 # ─────────────────────────────────────────────────────────────────────────────
 
-def create_video_from_images(images_dir: Path, video_path: Path, fps: int = 30) -> bool:
-    """Build an MP4 from all .jpg images in *images_dir* and write to *video_path*."""
+# Codecs the ui-service's <video> tag (and most browsers) can decode natively.
+# Anything else gets re-encoded to H.264 below — this is the single place
+# that transcoding happens; the ui-service just serves files from VIDEOS_DIR
+# as-is and relies on this script having already made them browser-playable.
+_BROWSER_SAFE_CODECS = {"h264", "hevc", "vp8", "vp9", "av1"}
+
+
+_FFMPEG_EXE = None
+
+
+def get_ffmpeg_exe():
+    """Return a path to an ffmpeg binary, or None if none is available.
+
+    Uses ffmpeg from PATH when present; otherwise falls back to the static
+    binary bundled with the ``imageio-ffmpeg`` package (installed by
+    ``make prepare-data`` from ``scripts/requirements.txt``).
+    """
+    global _FFMPEG_EXE
+    if _FFMPEG_EXE:
+        return _FFMPEG_EXE
+
+    exe = shutil.which("ffmpeg")
+    if exe is None:
+        try:
+            import imageio_ffmpeg
+            exe = imageio_ffmpeg.get_ffmpeg_exe()
+        except (ImportError, RuntimeError) as e:
+            print(f"   ⚠️  ffmpeg not found on PATH and no bundled ffmpeg available: {e}")
+            print("      Run 'make prepare-data', or install ffmpeg (e.g. 'sudo apt install ffmpeg').")
+            return None
+    _FFMPEG_EXE = exe
+    return exe
+
+
+def probe_video_codec(video_path: Path):
+    """Return *video_path*'s first video stream's codec name, or None if unknown.
+
+    Parses ``ffmpeg -i`` output so it works with a bundled ffmpeg that ships
+    without ffprobe.
+    """
+    ffmpeg = get_ffmpeg_exe()
+    if ffmpeg is None:
+        return None
+    try:
+        result = subprocess.run(
+            [ffmpeg, "-hide_banner", "-i", str(video_path)],
+            capture_output=True, check=False, shell=False, timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    match = re.search(r"Stream #\S+: Video: (\w+)", result.stderr.decode(errors="replace"))
+    return match.group(1) if match else None
+
+
+def repack_to_h264(video_path: Path, crf: str = "15", preset: str = "slow") -> bool:
+    """Re-encode *video_path* to H.264 + faststart, in place.
+
+    Used for both cv2-written videos (always MPEG-4 Part 2, needs this to be
+    playable in a browser at all) and manually dropped-in videos. Uses a
+    near-lossless CRF by default so DL Streamer inference results aren't
+    perceptibly shifted near detection-confidence threshold cutoffs — pass a
+    faster/lossier preset only if this file is never used for inference.
+    """
+    ffmpeg = get_ffmpeg_exe()
+    if ffmpeg is None:
+        print("   ❌ ffmpeg unavailable — video is not browser-playable.")
+        return False
+
+    tmp_path = video_path.with_suffix(".faststart.mp4")
+    try:
+        ret = subprocess.run(
+            [ffmpeg, "-y", "-i", str(video_path),
+             "-c:v", "libx264", "-preset", preset, "-crf", crf,
+             "-pix_fmt", "yuv420p", "-an",
+             "-movflags", "+faststart", str(tmp_path)],
+            capture_output=True,
+            check=False,
+            shell=False,
+        )
+        if ret.returncode == 0:
+            tmp_path.replace(video_path)
+            return True
+        tmp_path.unlink(missing_ok=True)
+        print("   ❌ ffmpeg H.264/faststart repack failed — video is not browser-playable.")
+        print(ret.stderr.decode(errors="replace")[-300:])
+        return False
+    except OSError as e:
+        print(f"   ❌ Could not run ffmpeg: {e}")
+        return False
+
+
+def transcode_existing_video(video_path: Path) -> bool:
+    """Transcode an existing/manually-dropped-in video to H.264 in place, if needed.
+
+    Used for the ``--transcode-video`` CLI mode so a video someone places
+    directly at e.g. ``apps/<app>/resources/videos/datastream.mp4`` (per that
+    directory's README) gets the same one-time H.264/faststart repack that
+    ``create_video_from_images`` applies to script-generated videos, without
+    needing the ui-service to transcode it on demand.
+    """
+    if not video_path.is_file():
+        print(f"❌ {video_path} does not exist.")
+        return False
+
+    codec = probe_video_codec(video_path)
+    if codec in _BROWSER_SAFE_CODECS:
+        print(f"✅ {video_path} is already browser-playable (codec={codec}) — nothing to do.")
+        return True
+
+    print(f"🎬 Transcoding {video_path} (codec={codec}) to H.264/faststart...")
+    if repack_to_h264(video_path):
+        print(f"   ✅ {video_path} is now browser-playable.")
+        return True
+    return False
+
+
+def list_images_sorted(images_dir: Path) -> list:
+    """Return all .jpg (falling back to .png) images in *images_dir*, sorted by name.
+
+    This is the single source of truth for "frame order" — both video creation
+    and the frame-index → filename manifest must iterate this same list so a
+    DL Streamer frame id can be reliably mapped back to its source image.
+    """
+    image_files = sorted(images_dir.glob("*.jpg"))
+    if not image_files:
+        image_files = sorted(images_dir.glob("*.png"))
+    return image_files
+
+
+def write_frame_manifest(image_files: list, manifest_path: Path) -> None:
+    """Write a frame_index -> filename JSON manifest for *image_files* (in order).
+
+    Lets a later stage join a DL Streamer pipeline's per-frame results (only a
+    frame id, no filename) back to the original image filename (e.g. to re-join
+    per-sample sensor CSV rows keyed by filename).
+    """
+    manifest = {str(i): f.name for i, f in enumerate(image_files)}
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(json.dumps(manifest, indent=2))
+    print(f"   ✅ {manifest_path}  ({len(manifest)} frames)")
+
+
+def create_video_from_images(images_dir: Path, video_path: Path, fps: int = 30,
+                             manifest_path: Path = None) -> bool:
+    """Build an MP4 from all .jpg images in *images_dir* and write to *video_path*.
+
+    If *manifest_path* is given, also writes a frame_index -> filename JSON
+    manifest (see ``write_frame_manifest``) using the exact same sorted file
+    order the video frames are written in.
+    """
     if cv2 is None:
         print("   ⚠️  opencv-python not installed — skipping video creation.")
-        print("       Install with: pip install opencv-python")
+        print("       Run 'make prepare-data', or install it with: sudo apt install python3-opencv")
         return False
 
     image_files = sorted(images_dir.glob("*.jpg"))
