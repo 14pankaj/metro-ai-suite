@@ -278,11 +278,11 @@ _FFMPEG_EXE = None
 
 
 def get_ffmpeg_exe():
-    """Return a path to an ffmpeg binary, installing one if none is available.
+    """Return a path to an ffmpeg binary, or None if none is available.
 
-    Uses ffmpeg from PATH when present; otherwise pip-installs the
-    ``imageio-ffmpeg`` package (which bundles a static ffmpeg binary) into the
-    current Python environment. Returns None if neither is possible.
+    Uses ffmpeg from PATH when present; otherwise falls back to the static
+    binary bundled with the ``imageio-ffmpeg`` package (installed by
+    ``make prepare-data`` from ``scripts/requirements.txt``).
     """
     global _FFMPEG_EXE
     if _FFMPEG_EXE:
@@ -290,19 +290,12 @@ def get_ffmpeg_exe():
 
     exe = shutil.which("ffmpeg")
     if exe is None:
-        print("   ℹ️  ffmpeg not found on PATH — installing imageio-ffmpeg...")
         try:
-            subprocess.run(
-                [sys.executable, "-m", "pip", "install", "--quiet", "imageio-ffmpeg"],
-                check=True, shell=False, capture_output=True,
-            )
-            import importlib
             import imageio_ffmpeg
-            importlib.reload(imageio_ffmpeg)
             exe = imageio_ffmpeg.get_ffmpeg_exe()
-        except (subprocess.CalledProcessError, OSError, ImportError, RuntimeError) as e:
-            print(f"   ⚠️  Could not install a bundled ffmpeg: {e}")
-            print("      Install ffmpeg manually (e.g. 'sudo apt install ffmpeg').")
+        except (ImportError, RuntimeError) as e:
+            print(f"   ⚠️  ffmpeg not found on PATH and no bundled ffmpeg available: {e}")
+            print("      Run 'make prepare-data', or install ffmpeg (e.g. 'sudo apt install ffmpeg').")
             return None
     _FFMPEG_EXE = exe
     return exe
@@ -426,7 +419,7 @@ def create_video_from_images(images_dir: Path, video_path: Path, fps: int = 30,
     """
     if cv2 is None:
         print("   ⚠️  opencv-python not installed — skipping video creation.")
-        print("       Install with: pip install opencv-python")
+        print("       Run 'make prepare-data', or install it with: sudo apt install python3-opencv")
         return False
 
     image_files = list_images_sorted(images_dir)
